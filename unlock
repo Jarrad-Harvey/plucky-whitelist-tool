@@ -23,7 +23,7 @@ NC="\033[0m" # No Color
 usage() {
   cat <<EOF
 Usage:
-  unlock <code> [duration]
+  unlock <code> [allow_duration]
   unlock --register <code> (program=<program> | import=<import> | rule=<rule>) [delay=<delay_duration>] [allow=<allow_duration>]
   unlock --list
 
@@ -80,9 +80,15 @@ fi
 # LIST MODE
 # -------------------------------------------------
 if [[ "$MODE" == "list" ]]; then
-  echo "Registered unlockable items:"
-  jq -r 'to_entries[] | [.key, .value.rule, .value.allow] | @tsv' "$JSON_FILE" | while IFS=$'\t' read -r key rule duration; do
-    printf "  ${GREEN}%-15s${NC} → ${YELLOW}%-25s${NC} (default duration: ${CYAN}%s${NC})\n" "$key" "$rule" "$duration"
+  # echo "Registered unlockable items:"
+  # jq -r 'to_entries[] | [.key, .value.rule, .value.allow] | @tsv' "$JSON_FILE" | while IFS=$'\t' read -r key rule allow; do
+  #   printf "  ${GREEN}%-15s${NC} → ${YELLOW}%-25s${NC} (allow: ${CYAN}%s${NC})\n" "$key" "$rule" "$allow"
+  # done
+  # exit 0
+
+  # Include delay in listing
+  jq -r 'to_entries[] | [.key, .value.rule, .value.allow, .value.delay] | @tsv' "$JSON_FILE" | while IFS=$'\t' read -r key rule allow delay; do
+    printf "  ${GREEN}%-15s${NC} → ${YELLOW}%-45s${NC} (allow: ${CYAN}%s${NC}, delay: ${CYAN}%s${NC})\n" "$key" "$rule" "$allow" "$delay"
   done
   exit 0
 fi
