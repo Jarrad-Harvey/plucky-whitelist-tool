@@ -65,6 +65,9 @@ MODE="unlock"
 if [[ "${1:-}" == "--register" ]]; then
   MODE="register"
   shift
+elif [[ "${1:-}" == "--edit" ]]; then
+  MODE="edit"
+  shift
 elif [[ "${1:-}" == "--list" ]]; then
   MODE="list"
   shift
@@ -105,19 +108,31 @@ fi
 
 
 # -------------------------------------------------
-# REGISTER MODE
+# REGISTER / EDIT MODE
 # -------------------------------------------------
-if [[ "$MODE" == "register" ]]; then
+if [[ "$MODE" == "register" || "$MODE" == "edit" ]]; then
   [[ $# -ge 1 ]] || usage
   KEY="$(echo "$1" | tr '[:upper:]' '[:lower:]')"
   shift
 
-  # Initialize durations to defaults
+  # Defaults
   DELAY_DURATION="$DEFAULT_DELAY"
   ALLOW_DURATION="$DEFAULT_ALLOW"
-
-  # Parse remaining args for rule shorthand and optional durations
   RULE=""
+
+  # When editing, use existing values as defaults
+  if [[ "$MODE" == "edit" ]]; then
+    EXISTING=$(jq -r ".\"$KEY\"" "$JSON_FILE")
+    if [[ "$EXISTING" == "null" ]]; then
+      echo "Error: '$KEY' not found."
+      exit 1
+    fi
+    DELAY_DURATION=$(echo "$EXISTING" | jq -r '.delay // "'"$DEFAULT_DELAY"'"')
+    ALLOW_DURATION=$(echo "$EXISTING" | jq -r '.allow // "'"$DEFAULT_ALLOW"'"')
+    RULE=$(echo "$EXISTING" | jq -r '.rule // ""')
+  fi
+
+  # Parse args
   for arg in "$@"; do
     case "$arg" in
       delay=*) DELAY_DURATION="${arg#delay=}" ;;
@@ -128,13 +143,12 @@ if [[ "$MODE" == "register" ]]; then
     esac
   done
 
-  # Validate rule is set
   if [[ -z "$RULE" ]]; then
     echo "Error: rule not specified. Use program=XXX, import=XXX, or raw rule."
     usage
   fi
 
-  # Update JSON atomically
+  # Update JSON
   TMP_FILE="$(mktemp)"
   jq ". + {\"$KEY\": {\"rule\": \"$RULE\", \"allow\": \"$ALLOW_DURATION\", \"delay\": \"$DELAY_DURATION\"}}" "$JSON_FILE" > "$TMP_FILE"
   mv "$TMP_FILE" "$JSON_FILE"
