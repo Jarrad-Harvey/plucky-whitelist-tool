@@ -9,7 +9,7 @@ A Bash tool for managing an internet whitelist using Plucky.
 
 ## Features
 
-- `unlock <key> [duration]` — unlock an profile.
+- `unlock <key> [duration]` — activate an profile.
 - `unlock --register <key> (program=<program> | config=<config> | rule=<rule>) [delay=<delay>] [allow=<duration>]` — register a new profile.
     - Key: name of the profile. (e.g. dev, thesis, spotify)
     - Program: https://docs.pluckeye.net/how-to-allow-a-program
@@ -86,11 +86,13 @@ A blacklist is more flexible and less likely to interfere with day-to-day life; 
 **This is not recommended for beginners!** If you are trying this out for the first time, please use a short delay to avoid causing yourself problems.
 
 ### Off by default
-Most modern software blockers designed for self control (like Plucky) have the ability to change the filter over time. For example:
+Most modern software blockers implement automated scheduling, such as:
 - Blocking everything when you should be sleeping
 - Allowing gaming only on the weekend
 
-Scheduling blocked/allowed times is a common way to go—and this works very well. However, my personal interest is in factoring *intentionality* into the equation. My goal is that every time I sit down at my computer, I **choose** what I intend to do—and automatically that becomes the only thing that my computer is capable of doing. I think of it like heading off to a cabin in the woods and bringing nothing with me but a single project.
+Scheduling blocked/allowed times is a common strategy—and this works very well. However, my personal interest is in factoring *intentionality* into the equation.
+
+My goal is that every time I sit down at my computer, I **choose** what I intend to do—and automatically that becomes the only thing that my computer is capable of doing. I think of it like heading off to a cabin in the woods and bringing nothing with me but a single project.
 
 In my own system, apps/websites are sorted into 4 categories.
 - Always allowed
