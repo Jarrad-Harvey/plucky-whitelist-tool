@@ -78,7 +78,7 @@ fi
 # -------------------------------------------------
 if [[ "$MODE" == "list" ]]; then
   echo "Registered unlockable items:"
-  jq -r 'to_entries[] | [.key, .value.rule, .value.duration] | @tsv' "$JSON_FILE" | while IFS=$'\t' read -r key rule duration; do
+  jq -r 'to_entries[] | [.key, .value.rule, .value.allow] | @tsv' "$JSON_FILE" | while IFS=$'\t' read -r key rule duration; do
     printf "  ${GREEN}%-15s${NC} → ${YELLOW}%-25s${NC} (default duration: ${CYAN}%s${NC})\n" "$key" "$rule" "$duration"
   done
   exit 0
@@ -136,7 +136,7 @@ if [[ "$MODE" == "register" ]]; then
 
   # Update JSON atomically
   TMP_FILE="$(mktemp)"
-  jq ". + {\"$KEY\": {\"rule\": \"$RULE\", \"duration\": \"$ALLOW_DURATION\", \"delay\": \"$DELAY_DURATION\"}}" "$JSON_FILE" > "$TMP_FILE"
+  jq ". + {\"$KEY\": {\"rule\": \"$RULE\", \"allow\": \"$ALLOW_DURATION\", \"delay\": \"$DELAY_DURATION\"}}" "$JSON_FILE" > "$TMP_FILE"
   mv "$TMP_FILE" "$JSON_FILE"
 
   echo "Registered '$KEY' with rule '$RULE' (allow_duration=$ALLOW_DURATION, delay_duration=$DELAY_DURATION)"
@@ -152,7 +152,7 @@ fi
 # -------------------------------------------------
 [[ $# -ge 1 ]] || usage
 KEY="$(echo "$1" | tr '[:upper:]' '[:lower:]')"
-OVERRIDE_DURATION="${2:-}"
+ALLOW_DURATION="${2:-}"
 
 # Lookup JSON entry
 ENTRY=$(jq -r ".\"$KEY\"" "$JSON_FILE")
@@ -162,8 +162,8 @@ if [[ "$ENTRY" == "null" ]]; then
 fi
 
 RULE=$(echo "$ENTRY" | jq -r '.rule')
-DEFAULT_DURATION=$(echo "$ENTRY" | jq -r '.duration')
-DURATION="${OVERRIDE_DURATION:-$DEFAULT_DURATION}"
+DEFAULT_DURATION=$(echo "$ENTRY" | jq -r '.allow')
+DURATION="${ALLOW_DURATION:-$DEFAULT_DURATION}"
 
 # Build and execute pluck command
 WHEN="when:now+$DURATION"
