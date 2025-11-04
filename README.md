@@ -50,18 +50,19 @@ A Bash tool for managing an internet whitelist using Plucky.
 
 ## Usage Examples
 
-### Unlock profiles
+### Activate profiles
 
     unlock dev                # uses stored allow duration
     unlock spotify 45m        # overrides stored allow duration
 
-### Register profiles
+### Create/edit profiles
 
-    unlock --register spotify program=spotify delay=30m allow=1h
-    unlock --register dev import=71c1fafa-b147-41f0-9cb9-c5724b1a7e00 allow=45m
-    unlock --register custom action="program custom_tool --opt" allow=2h
+    unlock --create spotify program=spotify delay=30m allow=1h
+    unlock --create dev import=71c1fafa-b147-41f0-9cb9-c5724b1a7e00 allow=45m
+    unlock --create fun rule="allow tiktok.com"
+    unlock --edit fun delay=9999h
 
-### List all registered profiles
+### List all profiles
 
     unlock --list
 
