@@ -23,17 +23,18 @@ NC="\033[0m" # No Color
 usage() {
   cat <<EOF
 Usage:
-  unlock <code> [allow_duration]
-  unlock --register <code> (program=<program> | import=<import> | rule=<rule>) [delay=<delay_duration>] [allow=<allow_duration>]
+  unlock <profile> [allow_duration]
+  unlock --create/edit <profile> ( rule=<rule> | program=<program> | import=<import> ) [delay=<delay_duration>] [allow=<allow_duration>]
   unlock --list
+  unlock --sync
 
 Examples:
   unlock dev
   unlock spotify 45m
-  unlock --register thesis "import:XXX" delay=30m allow=8h
-  unlock --register dev import=XXX allow=8h
-  unlock --register zoom "program zoom.us" allow=45m
-  unlock --register spotify program=spotify
+  unlock --create dev import=XXX allow=8h
+  unlock --create thesis rule="import:XXX" delay=30m allow=8h
+  unlock --create spotify program=spotify
+  unlock --edit spotify allow=2h
 EOF
   exit 1
 }
@@ -62,8 +63,8 @@ fi
 # MODE DETECTION
 # -------------------------------------------------
 MODE="unlock"
-if [[ "${1:-}" == "--register" ]]; then
-  MODE="register"
+if [[ "${1:-}" == "--create" ]]; then
+  MODE="create"
   shift
 elif [[ "${1:-}" == "--edit" ]]; then
   MODE="edit"
@@ -80,15 +81,8 @@ fi
 # LIST MODE
 # -------------------------------------------------
 if [[ "$MODE" == "list" ]]; then
-  # echo "Registered unlockable items:"
-  # jq -r 'to_entries[] | [.key, .value.rule, .value.allow] | @tsv' "$JSON_FILE" | while IFS=$'\t' read -r key rule allow; do
-  #   printf "  ${GREEN}%-15s${NC} → ${YELLOW}%-25s${NC} (allow: ${CYAN}%s${NC})\n" "$key" "$rule" "$allow"
-  # done
-  # exit 0
-
-  # Include delay in listing
-  jq -r 'to_entries[] | [.key, .value.rule, .value.allow, .value.delay] | @tsv' "$JSON_FILE" | while IFS=$'\t' read -r key rule allow delay; do
-    printf "  ${GREEN}%-15s${NC} → ${YELLOW}%-45s${NC} (allow: ${CYAN}%s${NC}, delay: ${CYAN}%s${NC})\n" "$key" "$rule" "$allow" "$delay"
+  jq -r 'to_entries[] | [.key, .value.rule, .value.allow, .value.delay] | @tsv' "$JSON_FILE" | while IFS=$'\t' read -r profile rule allow delay; do
+    printf "  ${GREEN}%-15s${NC} → ${YELLOW}%-45s${NC} (allow: ${CYAN}%s${NC}, delay: ${CYAN}%s${NC})\n" "$profile" "$rule" "$allow" "$delay"
   done
   exit 0
 fi
@@ -97,16 +91,16 @@ fi
 # SYNC MODE
 # -------------------------------------------------
 if [[ "$MODE" == "sync" ]]; then
-  echo "Synchronizing all registered items (re-running pluck delay commands)..."
+  echo "Synchronizing all profiles (re-running pluck delay commands)..."
   
-  jq -r 'to_entries[] | [.key, .value.rule, .value.delay] | @tsv' "$JSON_FILE" | while IFS=$'\t' read -r key rule delay; do
-    printf "  ${GREEN}%-15s${NC} → ${YELLOW}%-25s${NC} (delay: ${CYAN}%s${NC})\n" "$key" "$rule" "$delay"
+  jq -r 'to_entries[] | [.key, .value.rule, .value.delay] | @tsv' "$JSON_FILE" | while IFS=$'\t' read -r profile rule delay; do
+    printf "  ${GREEN}%-15s${NC} → ${YELLOW}%-25s${NC} (delay: ${CYAN}%s${NC})\n" "$profile" "$rule" "$delay"
 
     # Only run pluck if delay is set
     if [[ -n "$delay" && "$delay" != "null" ]]; then
       "$PLUCK_CMD" delay "$delay" "$rule"
     else
-      echo "    Skipping '$key': delay not set"
+      echo "    Skipping '$profile': delay not set"
     fi
   done
   exit 0
@@ -114,11 +108,11 @@ fi
 
 
 # -------------------------------------------------
-# REGISTER / EDIT MODE
+# CREATE / EDIT MODE
 # -------------------------------------------------
-if [[ "$MODE" == "register" || "$MODE" == "edit" ]]; then
+if [[ "$MODE" == "create" || "$MODE" == "edit" ]]; then
   [[ $# -ge 1 ]] || usage
-  KEY="$(echo "$1" | tr '[:upper:]' '[:lower:]')"
+  PROFILE="$(echo "$1" | tr '[:upper:]' '[:lower:]')"
   shift
 
   # Defaults
@@ -128,9 +122,9 @@ if [[ "$MODE" == "register" || "$MODE" == "edit" ]]; then
 
   # When editing, use existing values as defaults
   if [[ "$MODE" == "edit" ]]; then
-    EXISTING=$(jq -r ".\"$KEY\"" "$JSON_FILE")
+    EXISTING=$(jq -r ".\"$PROFILE\"" "$JSON_FILE")
     if [[ "$EXISTING" == "null" ]]; then
-      echo "Error: '$KEY' not found."
+      echo "Error: '$PROFILE' not found."
       exit 1
     fi
     DELAY_DURATION=$(echo "$EXISTING" | jq -r '.delay // "'"$DEFAULT_DELAY"'"')
@@ -157,10 +151,10 @@ if [[ "$MODE" == "register" || "$MODE" == "edit" ]]; then
 
   # Update JSON
   TMP_FILE="$(mktemp)"
-  jq ". + {\"$KEY\": {\"rule\": \"$RULE\", \"allow\": \"$ALLOW_DURATION\", \"delay\": \"$DELAY_DURATION\"}}" "$JSON_FILE" > "$TMP_FILE"
+  jq ". + {\"$PROFILE\": {\"rule\": \"$RULE\", \"allow\": \"$ALLOW_DURATION\", \"delay\": \"$DELAY_DURATION\"}}" "$JSON_FILE" > "$TMP_FILE"
   mv "$TMP_FILE" "$JSON_FILE"
 
-  echo "Registered '$KEY' with rule '$RULE' (allow_duration=$ALLOW_DURATION, delay_duration=$DELAY_DURATION)"
+  echo "Created '$PROFILE' with rule '$RULE' (allow_duration=$ALLOW_DURATION, delay_duration=$DELAY_DURATION)"
 
   # Run initial pluck delay
   echo "Running: $PLUCK_CMD delay $DELAY_DURATION \"$RULE\""
@@ -172,13 +166,13 @@ fi
 # UNLOCK MODE
 # -------------------------------------------------
 [[ $# -ge 1 ]] || usage
-KEY="$(echo "$1" | tr '[:upper:]' '[:lower:]')"
+PROFILE="$(echo "$1" | tr '[:upper:]' '[:lower:]')"
 ALLOW_DURATION="${2:-}"
 
 # Lookup JSON entry
-ENTRY=$(jq -r ".\"$KEY\"" "$JSON_FILE")
+ENTRY=$(jq -r ".\"$PROFILE\"" "$JSON_FILE")
 if [[ "$ENTRY" == "null" ]]; then
-  echo "Error: '$KEY' not found in JSON."
+  echo "Error: '$PROFILE' not found in JSON."
   exit 1
 fi
 
@@ -188,6 +182,6 @@ DURATION="${ALLOW_DURATION:-$DEFAULT_DURATION}"
 
 # Build and execute pluck command
 WHEN="when:now+$DURATION"
-echo "Unlocking '$KEY' ($RULE) for $DURATION"
+echo "Unlocking '$PROFILE' ($RULE) for $DURATION"
 echo "$PLUCK_CMD" + "$WHEN" "$RULE"
 exec "$PLUCK_CMD" + "$WHEN" "$RULE"
