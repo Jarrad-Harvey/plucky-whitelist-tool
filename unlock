@@ -146,6 +146,7 @@ if [[ "$MODE" == "register" || "$MODE" == "edit" ]]; then
       program=*) RULE="allow program ${arg#program=}" ;;
       import=*) RULE="import:${arg#import=}" ;;
       rule=*) RULE="${arg#rule=}" ;;
+      *) echo "Error: unknown option '$arg'"; usage ;;
     esac
   done
 
