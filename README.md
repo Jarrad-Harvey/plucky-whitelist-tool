@@ -1,23 +1,24 @@
 # plucky-whitelist-tool
 
-A Bash tool to manage an internet whitelist using Plucky.
+A Bash tool for managing an internet whitelist using Plucky.
 
-Supports registering items, unlocking them, listing registered items, and syncing delay commands.
+- Creates profiles from bundling together Plucky rules
+- Unlocks them with a single concise command: `unlock dev`
 
 > Read about Plucky: https://docs.pluckeye.net/overview
 
 ## Features
 
-- `unlock <key> [duration]` — unlock an item.
-- `unlock --register <key> (program=<program> | config=<config> | rule=<rule>) [delay=<delay>] [allow=<duration>]` — register a new item.
-    - Key: name of the item. (e.g. dev, thesis, spotify)
+- `unlock <key> [duration]` — unlock an profile.
+- `unlock --register <key> (program=<program> | config=<config> | rule=<rule>) [delay=<delay>] [allow=<duration>]` — register a new profile.
+    - Key: name of the profile. (e.g. dev, thesis, spotify)
     - Program: https://docs.pluckeye.net/how-to-allow-a-program
     - Config: https://docs.pluckeye.net/imports
     - Rule: https://docs.pluckeye.net/rules
     - Delay: https://docs.pluckeye.net/delay
-    - Allow: default amount of time to allow when unlocking the item.
-- `unlock --list` — show all items.
-- `unlock --sync` — re-run plucky initialisation commands for all items.
+    - Allow: default amount of time to allow after unlocking.
+- `unlock --list` — show all profiles.
+- `unlock --sync` — re-run plucky delay settings for all profile.
 
 ## Installation
 
@@ -46,22 +47,22 @@ Supports registering items, unlocking them, listing registered items, and syncin
 
 ## Usage Examples
 
-### Unlock items
+### Unlock profiles
 
     unlock dev                # uses stored allow duration
     unlock spotify 45m        # overrides stored allow duration
 
-### Register items
+### Register profiles
 
     unlock --register spotify program=spotify delay=30m allow=1h
     unlock --register dev config=71c1fafa-b147-41f0-9cb9-c5724b1a7e00 allow=45m
     unlock --register custom action="program custom_tool --opt" allow=2h
 
-### List all registered items
+### List all registered profiles
 
     unlock --list
 
-### Sync all items (re-run initial delays)
+### Sync all profiles (re-run initial delays)
 
     unlock --sync
 
@@ -123,5 +124,5 @@ Note: There is currently no way to edit the user site configs without going dire
 ## Contributing
 
 1. Fork the repository.  
-2. Make your changes (add items, improve output, etc.).  
+2. Make your changes.
 3. Submit a pull request.
