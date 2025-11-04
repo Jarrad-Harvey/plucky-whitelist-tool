@@ -10,13 +10,16 @@ A Bash tool for managing an internet whitelist using Plucky.
 ## Features
 
 - `unlock <key> [duration]` — activate an profile.
-- `unlock --register <key> (program=<program> | import=<import> | rule=<rule>) [delay=<delay>] [allow=<duration>]` — register a new profile.
+- `unlock --register <key> ( rule=<rule> | program=<program> | import=<import> ) [delay=<delay>] [allow=<duration>]` — register a new profile.
     - Key: name of the profile. (e.g. dev, thesis, spotify)
-    - Program: https://docs.pluckeye.net/how-to-allow-a-program
-    - Import: https://docs.pluckeye.net/imports
     - Rule: https://docs.pluckeye.net/rules
+    - Program: https://docs.pluckeye.net/how-to-allow-a-program
+        - equivalent of `rule="allow program XXX"`
+    - Import: https://docs.pluckeye.net/imports
+        - equivalent of `rule="import:XXX"`
     - Delay: https://docs.pluckeye.net/delay
     - Allow: default amount of time to allow after unlocking.
+- `unlock --edit <key> ( rule=<rule> | program=<program> | import=<import> ) [delay=<delay>] [allow=<duration>]` — edit an existing profile.
 - `unlock --list` — show all profiles.
 - `unlock --sync` — re-run plucky delay settings for all profile.
 
