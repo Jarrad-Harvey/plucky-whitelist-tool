@@ -46,7 +46,17 @@ if ! command -v jq >/dev/null; then
   exit 1
 fi
 
-[[ -f "$JSON_FILE" ]] || { echo "Error: $JSON_FILE not found"; exit 1; }
+# Ensure data folder and JSON file exist
+if [[ ! -d "$(dirname "$JSON_FILE")" ]]; then
+  echo "Creating data directory: $(dirname "$JSON_FILE")"
+  mkdir -p "$(dirname "$JSON_FILE")"
+fi
+
+if [[ ! -f "$JSON_FILE" ]]; then
+  echo "Creating new JSON file at $JSON_FILE"
+  echo "{}" > "$JSON_FILE"
+fi
+
 
 # -------------------------------------------------
 # MODE DETECTION
