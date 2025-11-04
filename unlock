@@ -24,14 +24,14 @@ usage() {
   cat <<EOF
 Usage:
   unlock <code> [duration]
-  unlock --register <code> (program=<program> | config=<config> | rule=<rule>) [delay=<delay_duration>] [allow=<allow_duration>]
+  unlock --register <code> (program=<program> | import=<import> | rule=<rule>) [delay=<delay_duration>] [allow=<allow_duration>]
   unlock --list
 
 Examples:
   unlock dev
   unlock spotify 45m
   unlock --register thesis "import:XXX" delay=30m allow=8h
-  unlock --register dev config=XXX allow=8h
+  unlock --register dev import=XXX allow=8h
   unlock --register zoom "program zoom.us" allow=45m
   unlock --register spotify program=spotify
 EOF
@@ -123,14 +123,14 @@ if [[ "$MODE" == "register" ]]; then
       delay=*) DELAY_DURATION="${arg#delay=}" ;;
       allow=*) ALLOW_DURATION="${arg#allow=}" ;;
       program=*) RULE="allow program ${arg#program=}" ;;
-      config=*) RULE="import:${arg#config=}" ;;
+      import=*) RULE="import:${arg#import=}" ;;
       rule=*) RULE="${arg#rule=}" ;;
     esac
   done
 
   # Validate rule is set
   if [[ -z "$RULE" ]]; then
-    echo "Error: rule not specified. Use program=XXX, config=XXX, or raw rule."
+    echo "Error: rule not specified. Use program=XXX, import=XXX, or raw rule."
     usage
   fi
 
