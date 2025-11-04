@@ -1,0 +1,162 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# -------------------------------------------------
+# CONFIG
+# -------------------------------------------------
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+JSON_FILE="$SCRIPT_DIR/unlock_data/entries.json"
+PLUCK_CMD="pluck"
+
+DEFAULT_DELAY="30m"
+DEFAULT_ALLOW="30m"
+
+# Color codes
+GREEN="\033[0;32m"
+YELLOW="\033[1;33m"
+CYAN="\033[0;36m"
+NC="\033[0m" # No Color
+
+# -------------------------------------------------
+# HELP
+# -------------------------------------------------
+usage() {
+  cat <<EOF
+Usage:
+  unlock <code> [duration]
+  unlock --register <code> (program=<name> | config=<config> | <action>) [delay=<delay_duration>] [allow=<allow_duration>]
+  unlock --list
+
+Examples:
+  unlock dev
+  unlock spotify 45m
+  unlock --register thesis "import:XXX" delay=30m allow=8h
+  unlock --register dev config=XXX allow=8h
+  unlock --register zoom "program zoom.us" allow=45m
+  unlock --register spotify program=spotify
+EOF
+  exit 1
+}
+
+# -------------------------------------------------
+# DEPENDENCIES
+# -------------------------------------------------
+if ! command -v jq >/dev/null; then
+  echo "jq is required – install with: brew install jq"
+  exit 1
+fi
+
+[[ -f "$JSON_FILE" ]] || { echo "Error: $JSON_FILE not found"; exit 1; }
+
+# -------------------------------------------------
+# MODE DETECTION
+# -------------------------------------------------
+MODE="unlock"
+if [[ "${1:-}" == "--register" ]]; then
+  MODE="register"
+  shift
+elif [[ "${1:-}" == "--list" ]]; then
+  MODE="list"
+  shift
+elif [[ "${1:-}" == "--sync" ]]; then
+  MODE="sync"
+  shift
+fi
+
+# -------------------------------------------------
+# LIST MODE
+# -------------------------------------------------
+if [[ "$MODE" == "list" ]]; then
+  echo "Registered unlockable items:"
+  jq -r 'to_entries[] | [.key, .value.action, .value.duration] | @tsv' "$JSON_FILE" | while IFS=$'\t' read -r key action duration; do
+    printf "  ${GREEN}%-15s${NC} → ${YELLOW}%-25s${NC} (default duration: ${CYAN}%s${NC})\n" "$key" "$action" "$duration"
+  done
+  exit 0
+fi
+
+# -------------------------------------------------
+# SYNC MODE
+# -------------------------------------------------
+if [[ "$MODE" == "sync" ]]; then
+  echo "Synchronizing all registered items (re-running pluck delay commands)..."
+  
+  jq -r 'to_entries[] | [.key, .value.action, .value.delay] | @tsv' "$JSON_FILE" | while IFS=$'\t' read -r key action delay; do
+    printf "  ${GREEN}%-15s${NC} → ${YELLOW}%-25s${NC} (delay: ${CYAN}%s${NC})\n" "$key" "$action" "$delay"
+
+    # Only run pluck if delay is set
+    if [[ -n "$delay" && "$delay" != "null" ]]; then
+      "$PLUCK_CMD" delay "$delay" "$action"
+    else
+      echo "    Skipping '$key': delay not set"
+    fi
+  done
+  exit 0
+fi
+
+
+# -------------------------------------------------
+# REGISTER MODE
+# -------------------------------------------------
+if [[ "$MODE" == "register" ]]; then
+  [[ $# -ge 1 ]] || usage
+  KEY="$(echo "$1" | tr '[:upper:]' '[:lower:]')"
+  shift
+
+  # Initialize durations to defaults
+  DELAY_DURATION="$DEFAULT_DELAY"
+  ALLOW_DURATION="$DEFAULT_ALLOW"
+
+  # Parse remaining args for action shorthand and optional durations
+  ACTION=""
+  for arg in "$@"; do
+    case "$arg" in
+      delay=*) DELAY_DURATION="${arg#delay=}" ;;
+      allow=*) ALLOW_DURATION="${arg#allow=}" ;;
+      program=*) ACTION="allow program ${arg#program=}" ;;
+      config=*) ACTION="import:${arg#config=}" ;;
+      action=*) ACTION="${arg#action=}" ;;
+    esac
+  done
+
+  # Validate action is set
+  if [[ -z "$ACTION" ]]; then
+    echo "Error: action not specified. Use program=XXX, config=XXX, or raw action."
+    usage
+  fi
+
+  # Update JSON atomically
+  TMP_FILE="$(mktemp)"
+  jq ". + {\"$KEY\": {\"action\": \"$ACTION\", \"duration\": \"$ALLOW_DURATION\", \"delay\": \"$DELAY_DURATION\"}}" "$JSON_FILE" > "$TMP_FILE"
+  mv "$TMP_FILE" "$JSON_FILE"
+
+  echo "Registered '$KEY' with action '$ACTION' (allow_duration=$ALLOW_DURATION, delay_duration=$DELAY_DURATION)"
+
+  # Run initial pluck delay
+  echo "Running: $PLUCK_CMD delay $DELAY_DURATION \"$ACTION\""
+  "$PLUCK_CMD" delay "$DELAY_DURATION" "$ACTION"
+  exit 0
+fi
+
+# -------------------------------------------------
+# UNLOCK MODE
+# -------------------------------------------------
+[[ $# -ge 1 ]] || usage
+KEY="$(echo "$1" | tr '[:upper:]' '[:lower:]')"
+OVERRIDE_DURATION="${2:-}"
+
+# Lookup JSON entry
+ENTRY=$(jq -r ".\"$KEY\"" "$JSON_FILE")
+if [[ "$ENTRY" == "null" ]]; then
+  echo "Error: '$KEY' not found in JSON."
+  exit 1
+fi
+
+ACTION=$(echo "$ENTRY" | jq -r '.action')
+DEFAULT_DURATION=$(echo "$ENTRY" | jq -r '.duration')
+DURATION="${OVERRIDE_DURATION:-$DEFAULT_DURATION}"
+
+# Build and execute pluck command
+WHEN="when:now+$DURATION"
+echo "Unlocking '$KEY' ($ACTION) for $DURATION"
+echo "$PLUCK_CMD" + "$WHEN" "$ACTION"
+exec "$PLUCK_CMD" + "$WHEN" "$ACTION"
