@@ -24,7 +24,7 @@ usage() {
   cat <<EOF
 Usage:
   unlock <code> [duration]
-  unlock --register <code> (program=<name> | config=<config> | <action>) [delay=<delay_duration>] [allow=<allow_duration>]
+  unlock --register <code> (program=<program> | config=<config> | rule=<rule>) [delay=<delay_duration>] [allow=<allow_duration>]
   unlock --list
 
 Examples:
@@ -68,8 +68,8 @@ fi
 # -------------------------------------------------
 if [[ "$MODE" == "list" ]]; then
   echo "Registered unlockable items:"
-  jq -r 'to_entries[] | [.key, .value.action, .value.duration] | @tsv' "$JSON_FILE" | while IFS=$'\t' read -r key action duration; do
-    printf "  ${GREEN}%-15s${NC} → ${YELLOW}%-25s${NC} (default duration: ${CYAN}%s${NC})\n" "$key" "$action" "$duration"
+  jq -r 'to_entries[] | [.key, .value.rule, .value.duration] | @tsv' "$JSON_FILE" | while IFS=$'\t' read -r key rule duration; do
+    printf "  ${GREEN}%-15s${NC} → ${YELLOW}%-25s${NC} (default duration: ${CYAN}%s${NC})\n" "$key" "$rule" "$duration"
   done
   exit 0
 fi
@@ -80,12 +80,12 @@ fi
 if [[ "$MODE" == "sync" ]]; then
   echo "Synchronizing all registered items (re-running pluck delay commands)..."
   
-  jq -r 'to_entries[] | [.key, .value.action, .value.delay] | @tsv' "$JSON_FILE" | while IFS=$'\t' read -r key action delay; do
-    printf "  ${GREEN}%-15s${NC} → ${YELLOW}%-25s${NC} (delay: ${CYAN}%s${NC})\n" "$key" "$action" "$delay"
+  jq -r 'to_entries[] | [.key, .value.rule, .value.delay] | @tsv' "$JSON_FILE" | while IFS=$'\t' read -r key rule delay; do
+    printf "  ${GREEN}%-15s${NC} → ${YELLOW}%-25s${NC} (delay: ${CYAN}%s${NC})\n" "$key" "$rule" "$delay"
 
     # Only run pluck if delay is set
     if [[ -n "$delay" && "$delay" != "null" ]]; then
-      "$PLUCK_CMD" delay "$delay" "$action"
+      "$PLUCK_CMD" delay "$delay" "$rule"
     else
       echo "    Skipping '$key': delay not set"
     fi
@@ -106,34 +106,34 @@ if [[ "$MODE" == "register" ]]; then
   DELAY_DURATION="$DEFAULT_DELAY"
   ALLOW_DURATION="$DEFAULT_ALLOW"
 
-  # Parse remaining args for action shorthand and optional durations
-  ACTION=""
+  # Parse remaining args for rule shorthand and optional durations
+  RULE=""
   for arg in "$@"; do
     case "$arg" in
       delay=*) DELAY_DURATION="${arg#delay=}" ;;
       allow=*) ALLOW_DURATION="${arg#allow=}" ;;
-      program=*) ACTION="allow program ${arg#program=}" ;;
-      config=*) ACTION="import:${arg#config=}" ;;
-      action=*) ACTION="${arg#action=}" ;;
+      program=*) RULE="allow program ${arg#program=}" ;;
+      config=*) RULE="import:${arg#config=}" ;;
+      rule=*) RULE="${arg#rule=}" ;;
     esac
   done
 
-  # Validate action is set
-  if [[ -z "$ACTION" ]]; then
-    echo "Error: action not specified. Use program=XXX, config=XXX, or raw action."
+  # Validate rule is set
+  if [[ -z "$RULE" ]]; then
+    echo "Error: rule not specified. Use program=XXX, config=XXX, or raw rule."
     usage
   fi
 
   # Update JSON atomically
   TMP_FILE="$(mktemp)"
-  jq ". + {\"$KEY\": {\"action\": \"$ACTION\", \"duration\": \"$ALLOW_DURATION\", \"delay\": \"$DELAY_DURATION\"}}" "$JSON_FILE" > "$TMP_FILE"
+  jq ". + {\"$KEY\": {\"rule\": \"$RULE\", \"duration\": \"$ALLOW_DURATION\", \"delay\": \"$DELAY_DURATION\"}}" "$JSON_FILE" > "$TMP_FILE"
   mv "$TMP_FILE" "$JSON_FILE"
 
-  echo "Registered '$KEY' with action '$ACTION' (allow_duration=$ALLOW_DURATION, delay_duration=$DELAY_DURATION)"
+  echo "Registered '$KEY' with rule '$RULE' (allow_duration=$ALLOW_DURATION, delay_duration=$DELAY_DURATION)"
 
   # Run initial pluck delay
-  echo "Running: $PLUCK_CMD delay $DELAY_DURATION \"$ACTION\""
-  "$PLUCK_CMD" delay "$DELAY_DURATION" "$ACTION"
+  echo "Running: $PLUCK_CMD delay $DELAY_DURATION \"$RULE\""
+  "$PLUCK_CMD" delay "$DELAY_DURATION" "$RULE"
   exit 0
 fi
 
@@ -151,12 +151,12 @@ if [[ "$ENTRY" == "null" ]]; then
   exit 1
 fi
 
-ACTION=$(echo "$ENTRY" | jq -r '.action')
+RULE=$(echo "$ENTRY" | jq -r '.rule')
 DEFAULT_DURATION=$(echo "$ENTRY" | jq -r '.duration')
 DURATION="${OVERRIDE_DURATION:-$DEFAULT_DURATION}"
 
 # Build and execute pluck command
 WHEN="when:now+$DURATION"
-echo "Unlocking '$KEY' ($ACTION) for $DURATION"
-echo "$PLUCK_CMD" + "$WHEN" "$ACTION"
-exec "$PLUCK_CMD" + "$WHEN" "$ACTION"
+echo "Unlocking '$KEY' ($RULE) for $DURATION"
+echo "$PLUCK_CMD" + "$WHEN" "$RULE"
+exec "$PLUCK_CMD" + "$WHEN" "$RULE"
