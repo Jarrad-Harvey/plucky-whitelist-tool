@@ -155,8 +155,8 @@ if [[ "$MODE" == "create" || "$MODE" == "edit" ]]; then
   echo "Created '$PROFILE' with rule '$RULE' (allow_duration=$ALLOW_DURATION, delay_duration=$DELAY_DURATION)"
 
   # Run initial pluck delay
-  echo "Running: $PLUCK_CMD delay $DELAY_DURATION \"$RULE\""
-  "$PLUCK_CMD" delay "$DELAY_DURATION" "$RULE"
+  echo "Running: $PLUCK_CMD delay $DELAY_DURATION \"+ $RULE\""
+  "$PLUCK_CMD" delay "$DELAY_DURATION" "+ $RULE"
   exit 0
 fi
 
